@@ -17,12 +17,30 @@ package lambdajam
 import java.io.File
 
 import scalaz.Monad
+import scalaz.syntax.id._
+
 
 case class FS[A](runFS: File => Result[A]) {
   def runPath(s: String): Result[A] = runFS(new File(s))
 
-  def map[B](f: A => B): FS[B] = ???
-  def flatMap[B](f: A => FS[B]): FS[B] = ???
+  def map[B](f: A => B): FS[B] = FS(runFS(_).map(f))
+
+  // alternative map
+  def map2[B](f: A => B): FS[B] = {
+    val g: (B) => FS[B] = thunk => FS(_ => Result.safeNull(thunk))
+    val h: (A) => FS[B] = f andThen g
+    flatMap(h)
+  }
+
+  def flatMap[B](f: A => FS[B]): FS[B] = FS(file => runFS(file).flatMap(f(_).runFS(file)))
+
+  // explained
+  def flatMap2[B](f: A => FS[B]): FS[B] =
+    FS(file => {
+      val runF: (A) => Result[B] = f(_).runFS(file)
+      val bbb: Result[A] = runFS(file)
+      bbb.flatMap(runF)
+    })
 
   /**
     * Set the error message in a failure case. Useful for providing contextual information without
@@ -71,17 +89,17 @@ case class FS[A](runFS: File => Result[A]) {
 }
 
 object FS extends ToRelResultOps {
-  def fs[A](a: => A): FS[A] = ???
+  def fs[A](a: => A): FS[A] = FS(_ => Result.safeNull(a))
 
   /** Lists the files in a directory but doesn't have a nice error message. */
   def listFiles: FS[List[String]] = FS(f => Result.safeNull(f.list).map(_.toList))
 
   /** List files but with a nice error message. */
-  def ls: FS[List[String]] = ???
+  def ls: FS[List[String]] = listFiles.addMessage("Something went wrong while listing")
 
   implicit def FSMonad: Monad[FS] = new Monad[FS] {
-    def point[A](v: => A) = ???
-    def bind[A, B](a: FS[A])(f: A => FS[B]) = ???
+    def point[A](v: => A) = fs(v)
+    def bind[A, B](a: FS[A])(f: A => FS[B]) = a.flatMap(f)
   }
 
 
