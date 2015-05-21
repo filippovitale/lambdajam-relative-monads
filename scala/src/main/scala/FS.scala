@@ -48,21 +48,22 @@ case class FS[A](runFS: File => Result[A]) {
     *
     * NB: This discards any existing message.
     */
-  def setMessage(message: String): FS[A] = ???
+  def setMessage(message: String): FS[A] = FS(runFS(_).setMessage(message))
+
 
   /**
     * Adds an additional error message. Useful for adding more context as the error goes up the stack.
     *
     * The new message is prepended to any existing message.
     */
-  def addMessage(message: String): FS[A] = ???
+  def addMessage(message: String): FS[A] = FS(runFS(_).addMessage(message))
 
   /**
     * Runs the first operation. If it fails, runs the second operation. Useful for chaining optional operations.
     *
     * Returns the error of `self` iff both `self` and `other` fail.
     */
-  def or(other: FS[A]): FS[A] = ???
+  def or(other: FS[A]): FS[A] = FS(file => runFS(file).or(other.runFS(file)))
 
   /**
     * Like "finally", but only performs the final action if there was an error.
@@ -107,12 +108,15 @@ object FS extends ToRelResultOps {
 
   implicit val relMonad: RelMonad[Result, FS] = new RelMonad[Result, FS] {
     /** Similar to a `Monad.point` but expects a `Result`. */
-    def rPoint[A](v: => Result[A]): FS[A] = ???
+    def rPoint[A](v: => Result[A]): FS[A] = FS(_ => v)
 
     /** Similar to a `Monad.bind` but expects a `Result`. */
-    def rBind[A, B](ma: FS[A])(f: Result[A] => Result[FS[B]]): FS[B] = ???
+    def rBind[A, B](ma: FS[A])(f: Result[A] => Result[FS[B]]): FS[B] =
+      FS { file =>
+        f(ma.runFS(file)).fold(_.runFS(file), Result.error)
+      }
   }
 
   /** List files but with a nice error message using RelResult functions. */
-  def rLS: FS[List[String]] = ???
+  def rLS: FS[List[String]] = listFiles.rSetMessage("Descriptive Error Message")
 }
