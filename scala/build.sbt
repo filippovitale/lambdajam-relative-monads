@@ -35,3 +35,5 @@ libraryDependencies ++= Seq(
 )
 
 updateOptions := updateOptions.value.withCachedResolution(true)
+
+resolvers += "asdfasfdsaf" at "https://dl.bintray.com/scalaz/releases"
