@@ -26,9 +26,18 @@ final class RelResultOps[R[_], A](val self: R[A])(implicit RM: RelMonad[Result, 
   import RelResultSyntax._
   val M = Monad[Result]
 
-  def rMap[B](f: Result[A] => Result[B]): R[B] = ???
+  def rMap[B](f: Result[A] => Result[B]): R[B] =
+    RM.rBind(self) { ra =>
+      val res: Result[B] = f(ra)
+      val r: R[B] = RM.rPoint(res)
+      M.point(r) // why I need this?
+    }
 
-  def rFlatMap[B](f: Result[A] => R[B]): R[B] = ???
+  def rFlatMap[B](f: Result[A] => R[B]): R[B] =
+    RM.rBind(self) { ra =>
+      val r: R[B] = f(ra)
+      M.point(r) // why I need this?
+    }
 
   /**
     * Set the error message in a failure case. Useful for providing contextual information without
@@ -36,14 +45,14 @@ final class RelResultOps[R[_], A](val self: R[A])(implicit RM: RelMonad[Result, 
     *
     * NB: This discards any existing message.
     */
-  def rSetMessage(message: String): R[A] = ???
+  def rSetMessage(message: String): R[A] = rMap[A](_.setMessage(message))
 
   /**
     * Adds an additional error message. Useful for adding more context as the error goes up the stack.
     *
     * The new message is prepended to any existing message.
     */
-  def rAddMessage(message: String, separator: String = ": "): R[A] = ???
+  def rAddMessage(message: String, separator: String = ": "): R[A] = rMap[A](_.addMessage(message, separator))
 
   /**
     * Runs the first operation. If it fails, runs the second operation. Useful for chaining optional operations.
