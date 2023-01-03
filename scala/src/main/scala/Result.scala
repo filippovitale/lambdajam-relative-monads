@@ -140,8 +140,3 @@ object Result {
       a or b
   }
 }
-/*
-    RM.rBind(self)(r => M.point(RM.rPoint(f(r))))
-    RM.rBind(self)(r => M.point(f(r)))
-
- */

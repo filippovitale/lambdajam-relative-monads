@@ -34,9 +34,10 @@ object MonadResult extends KleisliFunctions {
   trait ReaderTMonadResult[F[_], R] extends MonadResult[({ type λ[α] = ReaderT[F, R, α] })#λ] {
     implicit def M: MonadResult[F]
 
-    def raiseError[A](e: String): ReaderT[F, R, A] = ???
+    def raiseError[A](e: String): ReaderT[F, R, A] = kleisli(_ => M.raiseError(e))
 
-    def handleError[A](ma: ReaderT[F, R, A])(f: String => ReaderT[F, R, A]): ReaderT[F, R, A] = ???
+    def handleError[A](ma: ReaderT[F, R, A])(f: String => ReaderT[F, R, A]): ReaderT[F, R, A] =
+      kleisli(r => M.handleError(ma.run(r))(x => f(x).run(r)))
 
     def point[A](a: => A): ReaderT[F, R, A] = kleisli(_ => M.point(a))
 
@@ -44,9 +45,9 @@ object MonadResult extends KleisliFunctions {
   }
 
   implicit def resultMonadResult: MonadResult[Result] = new MonadResult[Result] {
-    def raiseError[A](e: String): Result[A] = ???
+    def raiseError[A](e: String): Result[A] = Result.error(e)
 
-    def handleError[A](ma: Result[A])(f: String => Result[A]): Result[A] = ???
+    def handleError[A](ma: Result[A])(f: String => Result[A]): Result[A] = ma.fold(Result.ok, f)
 
     def point[A](a: => A): Result[A] = Result.ok(a)
 
@@ -66,14 +67,14 @@ final class MonadResultOps[M[_], A](val self: M[A])(implicit M: MonadResult[M]) 
     *
     * NB: This discards any existing message.
     */
-  def tSetMessage(message: String): M[A] = ???
+  def tSetMessage(message: String): M[A] = handleError(_ => M.raiseError(message))
 
   /**
     * Adds an additional error message. Useful for adding more context as the error goes up the stack.
     *
     * The new message is prepended to any existing message.
     */
-  def tAddMessage(message: String, separator: String = ": "): M[A] = ???
+  def tAddMessage(message: String, separator: String = ": "): M[A] = handleError(m => M.raiseError(message + separator + m))
 
   /**
     * Like "finally", but only performs the final action if there was an error.
